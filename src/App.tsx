@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CurrentWeather from './components/CurrentWeather';
 import ForecastList from './components/ForecastList';
 import SearchBar from './components/SearchBar';
@@ -6,59 +6,28 @@ import EmptyState from './components/states/EmptyState';
 import ErrorState from './components/states/ErrorState';
 import LoadingState from './components/states/LoadingState';
 import UnitToggle from './components/UnitToggle';
-import { mockWeatherData } from './mocks/weather';
-import type { QueryStatus, Unit, WeatherData } from './types/weather';
+import { useWeather } from './hooks/useWeather';
+import type { Unit } from './types/weather';
 
-function normalizeCityName(city: string): string {
-  return city
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .trim()
-    .toLocaleLowerCase('pt-BR');
-}
+const dateHeadingFormatter = new Intl.DateTimeFormat('pt-BR', {
+  weekday: 'long',
+  day: '2-digit',
+  month: 'long',
+});
 
 export default function App() {
   const [unit, setUnit] = useState<Unit>('celsius');
-  const [status, setStatus] = useState<QueryStatus>('idle');
-  const [searchCity, setSearchCity] = useState('');
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
-  const dateHeading = new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-  }).format(new Date(`${mockWeatherData.forecast[0]?.dateLocal ?? '2026-10-27'}T12:00:00Z`));
+  const { status, data, error, search, retry } = useWeather();
+  const resultRef = useRef<HTMLElement>(null);
+  const previousStatusRef = useRef(status);
+  const dateHeading = dateHeadingFormatter.format(new Date());
 
   useEffect(() => {
-    if (status !== 'loading') return;
-
-    const timerId = window.setTimeout(() => {
-      try {
-        if (normalizeCityName(searchCity) !== normalizeCityName(mockWeatherData.city.name)) {
-          setStatus('empty');
-          return;
-        }
-
-        setWeatherData(mockWeatherData);
-        setErrorMessage('');
-        setStatus('success');
-      } catch {
-        setWeatherData(null);
-        setErrorMessage('Não foi possível carregar o clima. Tente novamente.');
-        setStatus('error');
-      }
-    }, 350);
-
-    return () => window.clearTimeout(timerId);
-  }, [searchCity, status]);
-
-  function handleSearch(city: string) {
-    setSearchCity(city);
-    setWeatherData(null);
-    setErrorMessage('');
-    setStatus('loading');
-  }
+    if (previousStatusRef.current === 'loading' && status !== 'loading' && status !== 'idle') {
+      resultRef.current?.focus();
+    }
+    previousStatusRef.current = status;
+  }, [status]);
 
   return (
     <div className="min-h-screen bg-night-900 text-white">
@@ -83,17 +52,17 @@ export default function App() {
               </span>
               <span>
                 <span className="block text-lg font-bold leading-tight">Clima</span>
-                <span className="block text-xs text-white/55">São Paulo · demonstração</span>
+                <span className="block text-xs text-white/55">Previsão meteorológica</span>
               </span>
             </a>
             <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-normal text-white/55 lg:hidden">
-              Dados demo
+              Clima local
             </span>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:w-[min(100%,52rem)]">
             <div className="min-w-0 flex-1">
-              <SearchBar onSearch={handleSearch} disabled={status === 'loading'} />
+              <SearchBar onSearch={search} disabled={status === 'loading'} />
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-start">
               <span className="text-xs font-medium text-white/55 sm:hidden">Temperatura</span>
@@ -107,7 +76,7 @@ export default function App() {
         id="main-content"
         tabIndex={-1}
         aria-busy={status === 'loading'}
-        className="mx-auto max-w-7xl px-4 py-8 focus:outline-none sm:px-6 sm:py-10 lg:px-8"
+        className="mx-auto max-w-7xl px-4 py-8 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400 sm:px-6 sm:py-10 lg:px-8"
       >
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -115,36 +84,43 @@ export default function App() {
             <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Visão do tempo</h1>
           </div>
           <span className="hidden rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/55 lg:inline-flex">
-            Dados demonstrativos
+            Celsius ou Fahrenheit
           </span>
         </div>
 
-        {status === 'idle' && (
-          <EmptyState
-            title="Consulte o tempo da sua cidade"
-            tip="Busque São Paulo para visualizar a demonstração de clima atual e previsão para cinco dias."
-          />
-        )}
+        <section
+          ref={resultRef}
+          tabIndex={-1}
+          aria-label="Resultado da consulta"
+          className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-400"
+        >
+          {status === 'idle' && (
+            <EmptyState
+              title="Consulte o tempo da sua cidade"
+              tip="Pesquise uma cidade para consultar as condições atuais e a previsão para cinco dias."
+            />
+          )}
 
-        {status === 'loading' && <LoadingState message="Carregando dados demonstrativos..." />}
+          {status === 'loading' && <LoadingState message="Carregando clima..." />}
 
-        {status === 'empty' && (
-          <EmptyState
-            title="Nenhuma cidade encontrada"
-            tip="Esta demonstração contém dados de São Paulo. Confira a grafia ou pesquise essa cidade."
-          />
-        )}
+          {status === 'empty' && (
+            <EmptyState
+              title="Nenhuma cidade encontrada"
+              tip="Confira a grafia ou tente informar a região e o país."
+            />
+          )}
 
-        {status === 'error' && (
-          <ErrorState message={errorMessage} onRetry={() => handleSearch(searchCity)} />
-        )}
+          {status === 'error' && (
+            <ErrorState message={error ?? 'Não foi possível carregar o clima.'} onRetry={retry} />
+          )}
 
-        {status === 'success' && weatherData && (
-          <div className="space-y-6">
-            <CurrentWeather city={weatherData.city} current={weatherData.current} unit={unit} />
-            <ForecastList forecast={weatherData.forecast} unit={unit} />
-          </div>
-        )}
+          {status === 'success' && data && (
+            <div className="space-y-6">
+              <CurrentWeather city={data.city} current={data.current} unit={unit} />
+              <ForecastList forecast={data.forecast} unit={unit} />
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

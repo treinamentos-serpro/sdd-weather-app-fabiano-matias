@@ -1,3 +1,4 @@
+import { formatMetric } from '../lib/format';
 import { formatTemperature } from '../lib/temperature';
 import { getWeatherCodePresentation } from '../lib/weatherCodes';
 import type { City, CurrentWeather as CurrentWeatherData, Unit } from '../types/weather';
@@ -6,10 +7,6 @@ interface CurrentWeatherProps {
   city: City;
   current: CurrentWeatherData;
   unit: Unit;
-}
-
-function formatMetric(value: number | undefined, unit: string): string {
-  return value === undefined ? '—' : `${value}${unit}`;
 }
 
 function formatObservedTime(observedAt: string): string {
@@ -30,7 +27,9 @@ export default function CurrentWeather({ city, current, unit }: CurrentWeatherPr
           <h2 id="current-weather-title" className="text-sm font-medium text-white/70">
             Clima atual
           </h2>
-          <p className="mt-2 text-2xl font-semibold">{city.name}</p>
+          <h3 className="mt-2 text-2xl font-semibold">
+            {city.name?.trim() || 'Localidade indisponível'}
+          </h3>
           {locationDetails && <p className="mt-1 text-sm text-white/60">{locationDetails}</p>}
         </div>
 
@@ -39,10 +38,19 @@ export default function CurrentWeather({ city, current, unit }: CurrentWeatherPr
             {condition.icon}
           </span>
           <div className="min-w-0">
-            <p className="whitespace-nowrap text-5xl font-semibold leading-none tracking-normal sm:text-7xl">
+            <p
+              role="status"
+              aria-label="Temperatura atual"
+              className="whitespace-nowrap text-5xl font-semibold leading-none tracking-normal sm:text-7xl"
+            >
               {formatTemperature(current.temperatureC, unit)}
             </p>
             <p className="mt-2 text-base text-white/75">{condition.label}</p>
+            {current.apparentTemperatureC !== undefined && (
+              <p className="mt-1 text-sm text-white/75">
+                Sensação térmica: {formatTemperature(current.apparentTemperatureC, unit)}
+              </p>
+            )}
             <p className="mt-1 text-sm text-white/55">
               Atualizado às {formatObservedTime(current.observedAt)}
             </p>
