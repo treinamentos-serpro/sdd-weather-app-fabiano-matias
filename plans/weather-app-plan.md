@@ -100,6 +100,8 @@ interface CurrentWeather {
   apparentTemperatureC?: number; // `apparent_temperature`, em Celsius.
   relativeHumidityPct?: number; // `relative_humidity_2m`, em porcentagem.
   windSpeedKmh?: number; // `wind_speed_10m`, normalizada para km/h.
+  precipitationMm?: number; // `precipitation`, em milímetros.
+  pressureHpa?: number; // `surface_pressure`, em hectopascais.
 }
 
 type ForecastDay =
@@ -203,7 +205,7 @@ flowchart TD
 
 - **URL:** `GET https://api.open-meteo.com/v1/forecast`
 - **Parâmetros:** `latitude=<City.latitude>`, `longitude=<City.longitude>`, `timezone=auto`, `forecast_days=5`, `temperature_unit=celsius`, `wind_speed_unit=kmh`, `precipitation_unit=mm`.
-- **`current`:** `temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m`.
+- **`current`:** `temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation,surface_pressure`.
 - **`daily`:** `weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max`.
 - **Resposta resumida:**
 
@@ -216,7 +218,9 @@ flowchart TD
     "relative_humidity_2m": 60,
     "apparent_temperature": 19.0,
     "weather_code": 0,
-    "wind_speed_10m": 12.0
+    "wind_speed_10m": 12.0,
+    "precipitation": 0.1,
+    "surface_pressure": 1013.0
   },
   "daily": {
     "time": ["2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"],
@@ -228,7 +232,7 @@ flowchart TD
 }
 ```
 
-- **Mapeamento para `WeatherData`:** o `City` selecionado é preservado; `timezone` → `WeatherData.timezone`; `current.time` → `CurrentWeather.observedAt`; `temperature_2m` → `temperatureC`; `weather_code` → `weatherCode`; `apparent_temperature` → `apparentTemperatureC`; `relative_humidity_2m` → `relativeHumidityPct`; `wind_speed_10m` → `windSpeedKmh`. Os arrays `daily` são unidos por índice: `time[i]` → `dateLocal`, `weather_code[i]` → `weatherCode`, `temperature_2m_min[i]`/`temperature_2m_max[i]` → mín./máx. em Celsius e `precipitation_probability_max[i]` → `precipitationProbabilityMaxPct`. O código WMO também alimenta o rótulo pt-BR por uma função de domínio; `retrievedAt` é gerado pelo cliente ao receber a resposta.
+- **Mapeamento para `WeatherData`:** o `City` selecionado é preservado; `timezone` → `WeatherData.timezone`; `current.time` → `CurrentWeather.observedAt`; `temperature_2m` → `temperatureC`; `weather_code` → `weatherCode`; `apparent_temperature` → `apparentTemperatureC`; `relative_humidity_2m` → `relativeHumidityPct`; `wind_speed_10m` → `windSpeedKmh`; `precipitation` → `precipitationMm`; `surface_pressure` → `pressureHpa`. Os arrays `daily` são unidos por índice: `time[i]` → `dateLocal`, `weather_code[i]` → `weatherCode`, `temperature_2m_min[i]`/`temperature_2m_max[i]` → mín./máx. em Celsius e `precipitation_probability_max[i]` → `precipitationProbabilityMaxPct`. O código WMO também alimenta o rótulo pt-BR por uma função de domínio; `retrievedAt` é gerado pelo cliente ao receber a resposta.
 - **Validação:** exigir timezone, temperatura e código atuais; para cada uma das cinco datas esperadas, exigir data, código e mín./máx. Se faltarem campos opcionais, omiti-los; se faltarem campos essenciais de um dia, criar `ForecastDay` indisponível para essa data. Normalizar apenas após verificar que os arrays diários têm índices correspondentes.
 
 Ambas as APIs são acessadas por HTTPS, sem API key. Não implementar fallback para outro provedor. Antes da distribuição, confirmar termos, atribuição, limites e cobertura exigidos pela especificação.
